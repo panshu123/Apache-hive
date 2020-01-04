@@ -1,0 +1,165 @@
+/* load the data in hive*/
+create table cdr (square_id int,time_interval bigint,country_code int,SMS_in double,SMS_out double,CALL_in double,CALL_out double,internet_traffic double)
+row format delimited
+fields terminated by '\t'
+lines terminated by '\n'
+stored as textfile;
+
+
+load data local inpath '/home/training/CDR.txt' into table cdr;
+
+/*create partition table*/
+
+create table s3 (square_id int,time_interval bigint,SMS_in double,SMS_out double,CALL_in double,CALL_out double,internet_traffic double)
+partitioned by (country_code int)
+row format delimited
+fields terminated by '\t'
+lines terminated by '\n'
+stored as textfile;
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+insert overwrite table s3 partition (country_code) select * from cdr;
+
+/*store the data corresponding only to these three countries  where country_code = 33,39,43
+
+insert overwrite local directory '/home/training/hive_project/data_of_3countries' select * from s3 where country_code = 33 or country_code = 39 or country_code =43;
+or without going to hive terminal
+hive -e 'use deepanshu; select * from s3 where country_code = 33 or country_code = 39 or country_code = 43' | sed 's/[\t]/,/g' > /home/training/hive_project/data_of_3countries.csv
+
+create table data_of_3countries (square_id int,time_interval bigint,country_code int,SMS_in double,SMS_out double,CALL_in double,CALL_out double,internet_traffic double)
+row format delimited
+fields terminated by ','
+lines terminated by '\n'
+stored as textfile;
+
+//load the data of that 3 countries
+
+load data local inpath '/home/training/hive_project/data_of_3countries.csv' into table data_of_3countries;
+
+
+
+
+
+
+//How many grids (square_ids) are there in total in the given three countries? Display the number of unique grids in the three countries.
+
+select count(square_id) from data_of_3countries
+
+select count(distinct(square_id)) from data_of_3countries
+
+
+
+
+
+
+
+
+
+
+
+
+
+//Which country has the minimum total internet activity? Display the country code of this country?
+
+hive -e 'use deepanshu; select country_code ,sum(internet_traffic) from data_of_3countries group by country_code' | sed 's/[\t]/,/g' > /home/training/hive_project/sum_internet_3countries.csv
+
+create table sum_internet_3countries(country_code int,internet_traffic double)
+row format delimited
+fields terminated by ','
+lines terminated by '\n'
+stored as textfile;
+
+load data local inpath '/home/training/hive_project/sum_internet_3countries.csv' into table sum_internet_3countries;
+//write the answer of this query anywhere  or store anywhere because in next query you using where condition with that value
+select min(internet_traffic) from sum_internet_3countries;
+
+select country_code from sum_internet_3countries where internet_traffic =   ;
+
+
+
+
+//Which country among the given three has the second highest total activity? Note that total activity is defined as the sum of sms_in, sms_out, call_in, call_out, internet_traffic. Display the country code of this country
+
+
+hive -e 'use deepanshu; select country_code ,sum(SMS_in),sum(SMS_out),sum(CALL_in),sum(CALL_out),sum(internet_traffic) from data_of_3countries group by country_code' | sed 's/[\t]/,/g' > /home/training/hive_project/sum_total_activity.csv
+
+create table sum_total_activity_3countries(country_code int,SMS_in double,SMS_out double,CALL_in double,CALL_out double,internet_traffic double)
+row format delimited
+fields terminated by ','
+lines terminated by '\n'
+stored as textfile;
+
+load data local inpath '/home/training/hive_project/sum_total_activity.csv' into table sum_total_activity_3countries;
+
+select country_code ,SMS_in+SMS_out+CALL_in+CALL_out+internet_traffic from sum_total_activity_3countries order by country_code DESC;
+
+//the second row shows which country has the second highest total activity as well as country code
+
+
+
+
+
+
+//Which squareID has the maximum total SMS activity in these three countries? Note that total SMS activity is the sum of incoming and outgoing SMSes.
+
+
+hive -e 'use deepanshu; select square_id ,sum(SMS_in)+sum(SMS_out) from data_of_3countries group by square_id' | sed 's/[\t]/,/g' > /home/training/hive_project/total_SMS_activity.csv
+
+create table total_SMSactivity_3countries (square_id int ,total_SMS_act double)
+row format delimited
+fields terminated by ','
+lines terminated by '\n'
+stored as textfile;
+
+load data local inpath '/home/training/hive_project/total_SMS_activity.csv' into table total_SMSactivity_3countries;
+
+select max(total_SMS_act) from total_SMSactivity_3countries;
+
+select square_id from total_SMSactivity_3countries where total_SMS_act = 2063.551389839242;
+
+
+
+
+
+
+
+
+
+
+
+
+//What is the total activity for the three countries? Note that total activity is defined as the sum of sms_in, sms_out, call_in, call_out, internet_traffic
+
+
+select country_code ,SMS_in+SMS_out+CALL_in+CALL_out+internet_traffic from sum_total_activity_3countries;
+
+
+
+
+
+TASK3
+
+
+
+//What is the total call activity from the three square_ids to country_code 39? Submit the result up to three decimal places, without rounding off the digits.  
+
+
+select sum(CALL_in)+sum(CALL_out) from data_of_3countries where country_code = 39 limit 3;
+
+
+
+
+
+
+//What is the total SMS activity from the three square_ids to country_code 39? 
+
+select sum(SMS_in)+sum(SMS_out) from data_of_3countries where country_code = 39 limit 3;
+
+
+
+//What is the total activity, i.e. sum of CallIn, CallOut, SMSIn, SMSOut, internet traffic of the three square_ids? 
+
+
+select sum(CALL_in)+sum(CALL_out)+sum(SMS_in)+sum(SMS_out)+sum(internet_traffic) from data_of_3countries where country_code = 39 limit 3;
